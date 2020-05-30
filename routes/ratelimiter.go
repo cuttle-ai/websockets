@@ -7,6 +7,7 @@ package routes
 import (
 	"time"
 
+	authConfig "github.com/cuttle-ai/auth-service/config"
 	"github.com/cuttle-ai/websockets/config"
 	"github.com/cuttle-ai/websockets/log"
 )
@@ -39,6 +40,8 @@ type AppContextRequest struct {
 	Out chan AppContextRequest
 	//Exhausted flag states whether the app context exhausted
 	Exhausted bool
+	//Session is  the user session
+	Session authConfig.Session
 }
 
 //AppContextRequestChan channel through which the app context routine takes requests from
@@ -82,41 +85,17 @@ func AppContext(in chan AppContextRequest) {
 			usedMaps[id] = time.Now()
 			req.AppContext = config.NewAppContext(log.NewLogger(id))
 			req.Exhausted = false
+			//we will also set the session
+			req.AppContext.Session = req.Session
 			go SendRequest(req.Out, req)
 		case Finished:
 			//we will return the rewwuest ids
 			delete(usedMaps, req.AppContext.Log.GetID())
 			freeMaps = append(freeMaps, req.AppContext.Log.GetID())
-		case CleanUp:
-			//clean up the timed out requests
-			n := time.Now()
-			tot := config.RequestRTimeout + config.ResponseTimeout + config.ResponseWTimeout
-			toBeAdded := []int{}
-			for k, v := range usedMaps {
-				if v.Add(tot).Before(n) {
-					toBeAdded = append(toBeAdded, k)
-					delete(usedMaps, k)
-				}
-			}
-			freeMaps = append(freeMaps, toBeAdded...)
 		}
-	}
-}
-
-//CleanupCheck is the cleanup check to be used as a go routine which periodically sends cleanup
-//requests to the AppContext go routines
-func CleanUpCheck(in chan AppContextRequest) {
-	/*
-	 * We will go into a infinte for loop
-	 * Will send the requests of type clean up
-	 */
-	for {
-		time.Sleep(config.RequestCleanUpCheck)
-		go SendRequest(in, AppContextRequest{Type: CleanUp})
 	}
 }
 
 func init() {
 	go AppContext(AppContextRequestChan)
-	go CleanUpCheck(AppContextRequestChan)
 }

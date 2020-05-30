@@ -20,17 +20,25 @@ import (
 
 var (
 	//Port in which the application is being served
-	Port = "8080"
-	//ResponseTimeout of the api to respond in milliseconds
-	ResponseTimeout = time.Duration(100 * time.Millisecond)
+	Port = "8078"
+	//IntPort is the port converted into integer
+	IntPort = 8078
+	//RPCPort in which the application's rpc server is being served
+	RPCPort = "8079"
+	//RPCIntPort is the rpc port converted into integer
+	RPCIntPort = 8079
 	//RequestRTimeout of the api request body read timeout in milliseconds
-	RequestRTimeout = time.Duration(20 * time.Millisecond)
+	RequestRTimeout = time.Duration(2000 * time.Millisecond)
 	//ResponseWTimeout of the api response write timeout in milliseconds
-	ResponseWTimeout = time.Duration(20 * time.Millisecond)
+	ResponseWTimeout = time.Duration(10000 * time.Millisecond)
 	//MaxRequests is the maximum no. of requests catered at a given point of time
 	MaxRequests = 1000
-	//RequestCleanUpCheck is the time after which request cleanup check has to happen
-	RequestCleanUpCheck = time.Duration(2 * time.Minute)
+	//DiscoveryURL is the url of the discovery service
+	DiscoveryURL = "127.0.0.1:8500"
+	//DiscoveryToken is the token to communicate with discovery service
+	DiscoveryToken = ""
+	//ServiceDomain is the url on which the service will be available across the platform
+	ServiceDomain = "127.0.0.1"
 )
 
 //SkipVault will skip the vault initialization if set true
@@ -94,6 +102,7 @@ func checkError(err error) {
 func init() {
 	/*
 	 * We will init the port
+	 * We will init rpc port
 	 * We will init the request timeout
 	 * We will init the request body read timeout
 	 * We will init the request body write timeout
@@ -102,16 +111,26 @@ func init() {
 	 */
 	//port
 	if len(os.Getenv("PORT")) != 0 {
-		//Assign the default port as 9090
+		//Assign the default port as 8078
 		Port = os.Getenv("PORT")
+		ip, err := strconv.Atoi(Port)
+		if err != nil {
+			//error whoile converting the port to integer
+			log.Fatal("Error while converting the port to integer", err.Error())
+		}
+		IntPort = ip
 	}
 
-	//response timeout
-	if len(os.Getenv("RESPONSE_TIMEOUT")) != 0 {
-		//if successful convert timeout
-		if t, err := strconv.ParseInt(os.Getenv("RESPONSE_TIMEOUT"), 10, 64); err == nil {
-			ResponseTimeout = time.Duration(t * int64(time.Millisecond))
+	//rpc port
+	if len(os.Getenv("RPC_PORT")) != 0 {
+		//Assign the default port as 8079
+		RPCPort = os.Getenv("RPC_PORT")
+		ip, err := strconv.Atoi(RPCPort)
+		if err != nil {
+			//error whoile converting the rpc port to integer
+			log.Fatal("Error while converting the rpc port to integer", err.Error())
 		}
+		RPCIntPort = ip
 	}
 
 	//request body read timeout
@@ -138,12 +157,23 @@ func init() {
 		}
 	}
 
-	//request cleanup check
-	if len(os.Getenv("REQUEST_CLEAN_UP_CHECK")) != 0 {
-		//if successful convert timeout
-		if t, err := strconv.ParseInt(os.Getenv("REQUEST_CLEAN_UP_CHECK"), 10, 64); err == nil {
-			RequestCleanUpCheck = time.Duration(t * int64(time.Minute))
-		}
+	//discovery service url
+	if len(os.Getenv("DISCOVERY_URL")) != 0 {
+		DiscoveryURL = os.Getenv("DISCOVERY_URL")
+	}
+
+	//discovery service token
+	if len(os.Getenv("DISCOVERY_TOKEN")) != 0 {
+		DiscoveryToken = os.Getenv("DISCOVERY_TOKEN")
+	}
+
+	if len(DiscoveryToken) == 0 {
+		log.Fatal("Token for discovery service is missing. Can't start the application without it")
+	}
+
+	//service domain
+	if len(os.Getenv("SERVICE_DOMAIN")) != 0 {
+		ServiceDomain = os.Getenv("SERVICE_DOMAIN")
 	}
 }
 
