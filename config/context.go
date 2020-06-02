@@ -13,7 +13,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 
 	authConfig "github.com/cuttle-ai/auth-service/config"
-
+	socketio "github.com/googollee/go-socket.io"
 	"github.com/jinzhu/gorm"
 )
 
@@ -80,6 +80,8 @@ type AppContext struct {
 	Log Logger
 	//Session is the session associated with the request
 	Session authConfig.Session
+	//WebSockets has the web sockets server instance
+	WebSockets *socketio.Server
 }
 
 var rootAppContext *AppContext
@@ -88,6 +90,7 @@ func init() {
 	/*
 	 * We will initialize the context
 	 * We will connect to the database
+	 * We will init the websockets server
 	 */
 	rootAppContext = &AppContext{}
 
@@ -95,11 +98,16 @@ func init() {
 	if err != nil {
 		log.Fatal("Error while creating the root app context. Connecting to DB failed. ", err)
 	}
+
+	err = rootAppContext.InitWebSockets()
+	if err != nil {
+		log.Fatal("Error while initalizing the websockets server")
+	}
 }
 
 //NewAppContext returns an initlized app context
 func NewAppContext(l Logger) *AppContext {
-	return &AppContext{Log: l, Db: rootAppContext.Db}
+	return &AppContext{Log: l, Db: rootAppContext.Db, WebSockets: rootAppContext.WebSockets}
 }
 
 //ConnectToDB connects the database and updates the Db property of the context as new connection
@@ -120,4 +128,55 @@ func (a *AppContext) ConnectToDB() error {
 		a.Db = d
 	}
 	return err
+}
+
+//InitWebSockets will initiate the websockets server
+func (a *AppContext) InitWebSockets() error {
+	/*
+	 * We will create a web sockets server
+	 * Assign it to the websockets instance
+	 * Then will start the server
+	 */
+	server, err := socketio.NewServer(nil)
+	if err != nil {
+		a.Log.Error("error while creating the websockets server")
+		return err
+	}
+
+	a.WebSockets = server
+
+	go a.WebSockets.Serve()
+	return nil
+}
+
+//RegisterWebsocketEvents will register websockets events to the websocket server instance
+func RegisterWebsocketEvents(namespace, event string, evtHandler interface{}) {
+	if rootAppContext.WebSockets == nil {
+		return
+	}
+	rootAppContext.WebSockets.OnEvent(namespace, event, evtHandler)
+}
+
+//RegisterWebsocketOnConnect will register the websocket on connect event callback
+func RegisterWebsocketOnConnect(namespace string, f func(socketio.Conn) error) {
+	if rootAppContext.WebSockets == nil {
+		return
+	}
+	rootAppContext.WebSockets.OnConnect(namespace, f)
+}
+
+//RegisterWebsocketOnError will register the websocket on error event callback
+func RegisterWebsocketOnError(namespace string, f func(socketio.Conn, error)) {
+	if rootAppContext.WebSockets == nil {
+		return
+	}
+	rootAppContext.WebSockets.OnError(namespace, f)
+}
+
+//RegisterWebsocketOnDisconnect will register the websocket on disconnect event callback
+func RegisterWebsocketOnDisconnect(namespace string, f func(socketio.Conn, string)) {
+	if rootAppContext.WebSockets == nil {
+		return
+	}
+	rootAppContext.WebSockets.OnDisconnect(namespace, f)
 }
