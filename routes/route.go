@@ -62,7 +62,6 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	 * If app contexts have exhausted, we will reject the request
 	 * Then we will set the app context in request
 	 * Execute request handler func
-	 * After execution return the app context
 	 */
 	//getting the context
 	ctx := req.Context()
@@ -112,13 +111,6 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	//executing the request
 	r.Exec(newCtx, res, req)
-
-	//returning the app context
-	appCtxReq = AppContextRequest{
-		Type:       Finished,
-		AppContext: resCtx.AppContext,
-	}
-	go SendRequest(AppContextRequestChan, appCtxReq)
 }
 
 //Exec will execute the handler func. By default it will set response content type as as json.

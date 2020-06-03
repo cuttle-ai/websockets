@@ -26,8 +26,10 @@ const (
 	Get RequestType = 0
 	//Finished is to return an app context
 	Finished RequestType = 1
-	//CleanUp is to clean up the non-returned app context
+	//CleanUp is to clean up the non-authenticated app context
 	CleanUp RequestType = 2
+	//Authenticate is to authenticate an unauthenticated request in system
+	Authenticate RequestType = 3
 )
 
 //AppContextRequest is the request to get, return or try clean up app contexts
@@ -62,7 +64,8 @@ func AppContext(in chan AppContextRequest) {
 	 */
 	//maps for storing the free and used requests
 	freeMaps := make([]int, config.MaxRequests)
-	usedMaps := make(map[int]time.Time, config.MaxRequests)
+	unauthenticatedMap := make(map[int]time.Time, config.MaxRequests)
+	authenticatedMap := make(map[int]time.Time, config.MaxRequests)
 
 	//generate the request pool
 	for i := 1; i <= config.MaxRequests; i++ {
@@ -82,20 +85,55 @@ func AppContext(in chan AppContextRequest) {
 			}
 			id := freeMaps[0]
 			freeMaps = freeMaps[1:]
-			usedMaps[id] = time.Now()
+			unauthenticatedMap[id] = time.Now()
 			req.AppContext = config.NewAppContext(log.NewLogger(id))
 			req.Exhausted = false
-			//we will also set the session
-			req.AppContext.Session = req.Session
 			go SendRequest(req.Out, req)
 		case Finished:
-			//we will return the rewwuest ids
-			delete(usedMaps, req.AppContext.Log.GetID())
+			//we will return the request ids
+			delete(authenticatedMap, req.AppContext.Log.GetID())
 			freeMaps = append(freeMaps, req.AppContext.Log.GetID())
+		case Authenticate:
+			//we will return the request ids
+			delete(unauthenticatedMap, req.AppContext.Log.GetID())
+			authenticatedMap[req.AppContext.Log.GetID()] = time.Now()
+		case CleanUp:
+			//clean up the timed out requests
+			n := time.Now()
+			tot := config.IdleRequestTimeout
+			maxLife := config.MaxRequestLife
+			toBeAdded := []int{}
+			for k, v := range unauthenticatedMap {
+				if v.Add(tot).Before(n) {
+					toBeAdded = append(toBeAdded, k)
+					delete(unauthenticatedMap, k)
+				}
+			}
+			for k, v := range authenticatedMap {
+				if v.Add(maxLife).Before(n) {
+					toBeAdded = append(toBeAdded, k)
+					delete(authenticatedMap, k)
+				}
+			}
+			freeMaps = append(freeMaps, toBeAdded...)
 		}
+	}
+}
+
+//CleanUpCheck is the cleanup check to be used as a go routine which periodically sends cleanup
+//requests to the AppContext go routines
+func CleanUpCheck(in chan AppContextRequest) {
+	/*
+	 * We will go into a infinte for loop
+	 * Will send the requests of type clean up
+	 */
+	for {
+		time.Sleep(config.RequestCleanUpCheck)
+		go SendRequest(in, AppContextRequest{Type: CleanUp})
 	}
 }
 
 func init() {
 	go AppContext(AppContextRequestChan)
+	go CleanUpCheck(AppContextRequestChan)
 }

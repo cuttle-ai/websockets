@@ -31,8 +31,14 @@ var (
 	RequestRTimeout = time.Duration(2000 * time.Millisecond)
 	//ResponseWTimeout of the api response write timeout in milliseconds
 	ResponseWTimeout = time.Duration(10000 * time.Millisecond)
+	//IdleRequestTimeout is the timeout after which unauthenticated requests must be disconnected of the system
+	IdleRequestTimeout = time.Duration(10000 * time.Millisecond)
+	//MaxRequestLife is the max request life time :- ie 4 hours is the default value
+	MaxRequestLife = time.Duration(14400000)
 	//MaxRequests is the maximum no. of requests catered at a given point of time
 	MaxRequests = 1000
+	//RequestCleanUpCheck is the time after which request cleanup check has to happen
+	RequestCleanUpCheck = time.Duration(2 * time.Minute)
 	//DiscoveryURL is the url of the discovery service
 	DiscoveryURL = "127.0.0.1:8500"
 	//DiscoveryToken is the token to communicate with discovery service
@@ -106,6 +112,8 @@ func init() {
 	 * We will init the request timeout
 	 * We will init the request body read timeout
 	 * We will init the request body write timeout
+	 * We will init the idle request timeout
+	 * We will init the max request life
 	 * We will init the max no. of requests
 	 * We will init the request cleanup check
 	 */
@@ -149,11 +157,35 @@ func init() {
 		}
 	}
 
+	//idle request timeout
+	if len(os.Getenv("IDLE_REQUEST_TIMEOUT")) != 0 {
+		//if successful convert timeout
+		if t, err := strconv.ParseInt(os.Getenv("IDLE_REQUEST_TIMEOUT"), 10, 64); err == nil {
+			IdleRequestTimeout = time.Duration(t * int64(time.Millisecond))
+		}
+	}
+
+	//max request life
+	if len(os.Getenv("MAX_REQUEST_LIFE")) != 0 {
+		//if successful convert life time
+		if t, err := strconv.ParseInt(os.Getenv("MAX_REQUEST_LIFE"), 10, 64); err == nil {
+			MaxRequestLife = time.Duration(t * int64(time.Millisecond))
+		}
+	}
+
 	//max no. of requests
 	if len(os.Getenv("MAX_REQUESTS")) != 0 {
 		//if successful convert timeout
 		if r, err := strconv.Atoi(os.Getenv("MAX_REQUESTS")); err == nil {
 			MaxRequests = r
+		}
+	}
+
+	//request cleanup check
+	if len(os.Getenv("REQUEST_CLEAN_UP_CHECK")) != 0 {
+		//if successful convert timeout
+		if t, err := strconv.ParseInt(os.Getenv("REQUEST_CLEAN_UP_CHECK"), 10, 64); err == nil {
+			RequestCleanUpCheck = time.Duration(t * int64(time.Minute))
 		}
 	}
 
