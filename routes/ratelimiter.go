@@ -28,8 +28,8 @@ const (
 	Finished RequestType = 1
 	//CleanUp is to clean up the non-authenticated app context
 	CleanUp RequestType = 2
-	//Authenticate is to authenticate an unauthenticated request in system
-	Authenticate RequestType = 3
+	//Fetch will return the context in the system by the context id
+	Fetch RequestType = 3
 )
 
 //AppContextRequest is the request to get, return or try clean up app contexts
@@ -44,6 +44,8 @@ type AppContextRequest struct {
 	Exhausted bool
 	//Session is  the user session
 	Session authConfig.Session
+	//ID of the appcontext for the fetch requests
+	ID int
 }
 
 //AppContextRequestChan channel through which the app context routine takes requests from
@@ -64,8 +66,8 @@ func AppContext(in chan AppContextRequest) {
 	 */
 	//maps for storing the free and used requests
 	freeMaps := make([]int, config.MaxRequests)
-	unauthenticatedMap := make(map[int]time.Time, config.MaxRequests)
 	authenticatedMap := make(map[int]time.Time, config.MaxRequests)
+	appCtxs := make(map[int]*config.AppContext)
 
 	//generate the request pool
 	for i := 1; i <= config.MaxRequests; i++ {
@@ -85,34 +87,36 @@ func AppContext(in chan AppContextRequest) {
 			}
 			id := freeMaps[0]
 			freeMaps = freeMaps[1:]
-			unauthenticatedMap[id] = time.Now()
-			req.AppContext = config.NewAppContext(log.NewLogger(id))
+			authenticatedMap[id] = time.Now()
+			req.AppContext = config.NewAppContext(log.NewLogger(id), id)
+			req.AppContext.Session = req.Session
 			req.Exhausted = false
+			appCtxs[req.AppContext.ID] = req.AppContext
+			go SendRequest(req.Out, req)
+		case Fetch:
+			req.Exhausted = false
+			appCtx, ok := appCtxs[req.ID]
+			if !ok {
+				//couldn't find the session
+				req.Exhausted = true
+			}
+			req.AppContext = appCtx
 			go SendRequest(req.Out, req)
 		case Finished:
 			//we will return the request ids
-			delete(authenticatedMap, req.AppContext.Log.GetID())
-			freeMaps = append(freeMaps, req.AppContext.Log.GetID())
-		case Authenticate:
-			//we will return the request ids
-			delete(unauthenticatedMap, req.AppContext.Log.GetID())
-			authenticatedMap[req.AppContext.Log.GetID()] = time.Now()
+			delete(authenticatedMap, req.AppContext.ID)
+			delete(appCtxs, req.AppContext.ID)
+			freeMaps = append(freeMaps, req.AppContext.ID)
 		case CleanUp:
 			//clean up the timed out requests
 			n := time.Now()
-			tot := config.IdleRequestTimeout
 			maxLife := config.MaxRequestLife
 			toBeAdded := []int{}
-			for k, v := range unauthenticatedMap {
-				if v.Add(tot).Before(n) {
-					toBeAdded = append(toBeAdded, k)
-					delete(unauthenticatedMap, k)
-				}
-			}
 			for k, v := range authenticatedMap {
 				if v.Add(maxLife).Before(n) {
 					toBeAdded = append(toBeAdded, k)
 					delete(authenticatedMap, k)
+					delete(appCtxs, k)
 				}
 			}
 			freeMaps = append(freeMaps, toBeAdded...)

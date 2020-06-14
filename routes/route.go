@@ -6,10 +6,14 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/cuttle-ai/websockets/config"
 	"github.com/cuttle-ai/websockets/log"
 	"github.com/cuttle-ai/websockets/routes/response"
+	socketio "github.com/googollee/go-socket.io"
 
 	authConfig "github.com/cuttle-ai/auth-service/config"
 
@@ -107,7 +111,8 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	//setting the app context
-	newCtx := context.WithValue(ctx, AppContextKey, resCtx.AppContext)
+	newCtx := context.WithValue(ctx, AppContextKey, resCtx.AppContext.ID)
+	res.Header().Set("cuttle-ai-context-id", strconv.Itoa(resCtx.AppContext.ID))
 
 	//executing the request
 	r.Exec(newCtx, res, req)
@@ -130,4 +135,54 @@ func (r Route) Exec(ctx context.Context, res http.ResponseWriter, req *http.Requ
 
 	//cancelling the context
 	cancel()
+}
+
+func onConnect(conn socketio.Conn) error {
+	/*
+	 * We will initiate the logger
+	 * Then we will try to get the context header from remote connection
+	 * Then we will try to fetch the app context
+	 * Then will set the context as appcontext
+	 */
+	//getting the logger
+	l := log.NewLogger(0)
+
+	//getting the app context header
+	contextHeader := conn.RemoteHeader().Get("cuttle-ai-context-id")
+	if len(contextHeader) == 0 {
+		log.Error("couldn't find the context header", contextHeader)
+		return errors.New("error while connecting. Couldn't find the app context info. This is likely to be an internal error")
+	}
+	contextID, err := strconv.Atoi(contextHeader)
+	if err != nil {
+		//error while parsing the context id
+		log.Error("couldn't parse the context id", contextHeader)
+		return errors.New("error while connecting. Couldn't parse the app context info. This is likely to be an internal error")
+	}
+
+	//fetching the app context
+	appCtxReq := AppContextRequest{
+		Type: Fetch,
+		Out:  make(chan AppContextRequest),
+		ID:   contextID,
+	}
+	go SendRequest(AppContextRequestChan, appCtxReq)
+	resCtx := <-appCtxReq.Out
+
+	//setting the app context
+	conn.SetContext(resCtx.AppContext)
+
+	l.Info("Client connected with id", conn.ID(), "and user id", resCtx.Session.User.ID)
+	return nil
+}
+
+func onDisconnect(conn socketio.Conn, message string) {
+	l := log.NewLogger(0)
+	u := conn.Context().(authConfig.User)
+	l.Info("Client disconnected with id", conn.ID(), "and user id", u.ID)
+}
+
+func init() {
+	config.RegisterWebsocketOnConnect(config.Namespace, onConnect)
+	config.RegisterWebsocketOnDisconnect(config.Namespace, onDisconnect)
 }

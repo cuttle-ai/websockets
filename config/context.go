@@ -74,6 +74,8 @@ func (d DbConfig) Connect() (*gorm.DB, error) {
 
 //AppContext contains the
 type AppContext struct {
+	//ID of the app context
+	ID int
 	//Db is the database connection
 	Db *gorm.DB
 	//Log for logging purposes
@@ -106,8 +108,8 @@ func init() {
 }
 
 //NewAppContext returns an initlized app context
-func NewAppContext(l Logger) *AppContext {
-	return &AppContext{Log: l, Db: rootAppContext.Db, WebSockets: rootAppContext.WebSockets}
+func NewAppContext(l Logger, id int) *AppContext {
+	return &AppContext{ID: id, Log: l, Db: rootAppContext.Db, WebSockets: rootAppContext.WebSockets}
 }
 
 //ConnectToDB connects the database and updates the Db property of the context as new connection
@@ -129,6 +131,11 @@ func (a *AppContext) ConnectToDB() error {
 	}
 	return err
 }
+
+const (
+	//Namespace is websockets namespace
+	Namespace = "/"
+)
 
 //InitWebSockets will initiate the websockets server
 func (a *AppContext) InitWebSockets() error {
