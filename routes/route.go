@@ -177,9 +177,14 @@ func onConnect(conn socketio.Conn) error {
 }
 
 func onDisconnect(conn socketio.Conn, message string) {
-	l := log.NewLogger(0)
-	u := conn.Context().(authConfig.User)
-	l.Info("Client disconnected with id", conn.ID(), "and user id", u.ID)
+	appCtx := conn.Context().(*config.AppContext)
+	//removing the user from the context
+	appCtxReq := AppContextRequest{
+		Type:       Finished,
+		AppContext: appCtx,
+	}
+	go SendRequest(AppContextRequestChan, appCtxReq)
+	appCtx.Log.Info("Client disconnected with id", conn.ID(), "and user id", appCtx.Session.User.ID)
 }
 
 func init() {
