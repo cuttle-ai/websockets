@@ -32,6 +32,8 @@ const (
 	CleanUp RequestType = 2
 	//Fetch will return the context in the system by the context id
 	Fetch RequestType = 3
+	//FetchWs will fetch the websocket connections
+	FetchWs RequestType = 4
 )
 
 //AppContextRequest is the request to get, return or try clean up app contexts
@@ -50,6 +52,8 @@ type AppContextRequest struct {
 	ID int
 	//Ws is the websockets connection
 	Ws socketio.Conn
+	//WsConns has the list of web socket connections for the user
+	WsConns []socketio.Conn
 }
 
 //AppContextRequestChan channel through which the app context routine takes requests from
@@ -97,21 +101,24 @@ func AppContext(in chan AppContextRequest) {
 			req.AppContext.Session = req.Session
 			req.Exhausted = false
 			appCtxs[req.AppContext.ID] = req.AppContext
-			uCo, ok := userMap[req.Session.User.ID]
-			if !ok {
-				uCo = []socketio.Conn{}
-			}
-			uCo = append(uCo, req.Ws)
-			userMap[req.Session.User.ID] = uCo
 			go SendRequest(req.Out, req)
 		case Fetch:
-			req.Exhausted = false
+			req.Exhausted = true
 			appCtx, ok := appCtxs[req.ID]
-			if !ok {
+			if ok {
 				//couldn't find the session
-				req.Exhausted = true
+				req.Exhausted = false
+				uCo, ok := userMap[appCtx.Session.User.ID]
+				if !ok {
+					uCo = []socketio.Conn{}
+				}
+				uCo = append(uCo, req.Ws)
+				userMap[req.Session.User.ID] = uCo
 			}
 			req.AppContext = appCtx
+			go SendRequest(req.Out, req)
+		case FetchWs:
+			req.WsConns, req.Exhausted = userMap[req.AppContext.Session.User.ID]
 			go SendRequest(req.Out, req)
 		case Finished:
 			//we will return the request ids
