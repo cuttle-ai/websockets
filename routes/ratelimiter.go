@@ -5,11 +5,13 @@
 package routes
 
 import (
+	"strings"
 	"time"
 
 	authConfig "github.com/cuttle-ai/auth-service/config"
 	"github.com/cuttle-ai/websockets/config"
 	"github.com/cuttle-ai/websockets/log"
+	socketio "github.com/googollee/go-socket.io"
 )
 
 /*
@@ -46,6 +48,8 @@ type AppContextRequest struct {
 	Session authConfig.Session
 	//ID of the appcontext for the fetch requests
 	ID int
+	//Ws is the websockets connection
+	Ws socketio.Conn
 }
 
 //AppContextRequestChan channel through which the app context routine takes requests from
@@ -68,6 +72,7 @@ func AppContext(in chan AppContextRequest) {
 	freeMaps := make([]int, config.MaxRequests)
 	authenticatedMap := make(map[int]time.Time, config.MaxRequests)
 	appCtxs := make(map[int]*config.AppContext)
+	userMap := make(map[uint][]socketio.Conn)
 
 	//generate the request pool
 	for i := 1; i <= config.MaxRequests; i++ {
@@ -92,6 +97,12 @@ func AppContext(in chan AppContextRequest) {
 			req.AppContext.Session = req.Session
 			req.Exhausted = false
 			appCtxs[req.AppContext.ID] = req.AppContext
+			uCo, ok := userMap[req.Session.User.ID]
+			if !ok {
+				uCo = []socketio.Conn{}
+			}
+			uCo = append(uCo, req.Ws)
+			userMap[req.Session.User.ID] = uCo
 			go SendRequest(req.Out, req)
 		case Fetch:
 			req.Exhausted = false
@@ -107,6 +118,18 @@ func AppContext(in chan AppContextRequest) {
 			delete(authenticatedMap, req.AppContext.ID)
 			delete(appCtxs, req.AppContext.ID)
 			freeMaps = append(freeMaps, req.AppContext.ID)
+			conns, ok := userMap[req.AppContext.Session.User.ID]
+			if !ok {
+				req.AppContext.Log.Error("couldn't find the user connection map for the user", req.AppContext.Session.User.ID, "and appctx id", req.AppContext.ID)
+				continue
+			}
+			for i := 0; i < len(conns); i++ {
+				if strings.Compare(conns[i].ID(), req.Ws.ID()) == 0 {
+					conns = append(conns[:i], conns[i+1:]...)
+					break
+				}
+			}
+			userMap[req.AppContext.Session.User.ID] = conns
 		case CleanUp:
 			//clean up the timed out requests
 			n := time.Now()

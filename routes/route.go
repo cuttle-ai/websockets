@@ -165,6 +165,7 @@ func onConnect(conn socketio.Conn) error {
 		Type: Fetch,
 		Out:  make(chan AppContextRequest),
 		ID:   contextID,
+		Ws:   conn,
 	}
 	go SendRequest(AppContextRequestChan, appCtxReq)
 	resCtx := <-appCtxReq.Out
@@ -182,6 +183,7 @@ func onDisconnect(conn socketio.Conn, message string) {
 	appCtxReq := AppContextRequest{
 		Type:       Finished,
 		AppContext: appCtx,
+		Ws:         conn,
 	}
 	go SendRequest(AppContextRequestChan, appCtxReq)
 	appCtx.Log.Info("Client disconnected with id", conn.ID(), "and user id", appCtx.Session.User.ID)
