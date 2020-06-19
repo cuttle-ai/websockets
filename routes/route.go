@@ -111,8 +111,8 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	//setting the app context
-	newCtx := context.WithValue(ctx, AppContextKey, resCtx.AppContext.ID)
-	res.Header().Set("cuttle-ai-context-id", strconv.Itoa(resCtx.AppContext.ID))
+	newCtx := context.WithValue(ctx, AppContextKey, resCtx.AppContext)
+	req.Header.Set("cuttle-ai-context-id", strconv.Itoa(resCtx.AppContext.ID))
 
 	//executing the request
 	r.Exec(newCtx, res, req)
@@ -173,7 +173,7 @@ func onConnect(conn socketio.Conn) error {
 	//setting the app context
 	conn.SetContext(resCtx.AppContext)
 
-	l.Info("Client connected with id", conn.ID(), "and user id", resCtx.Session.User.ID)
+	l.Info("Client connected with id", conn.ID(), "and user id", resCtx.AppContext.Session.User.ID)
 	return nil
 }
 
@@ -186,7 +186,7 @@ func onDisconnect(conn socketio.Conn, message string) {
 		Ws:         conn,
 	}
 	go SendRequest(AppContextRequestChan, appCtxReq)
-	appCtx.Log.Info("Client disconnected with id", conn.ID(), "and user id", appCtx.Session.User.ID)
+	appCtx.Log.Info("Client disconnected with id", conn.ID(), "and user id", appCtx.Session.User.ID, "with message", message)
 }
 
 func init() {

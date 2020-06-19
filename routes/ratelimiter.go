@@ -113,7 +113,7 @@ func AppContext(in chan AppContextRequest) {
 					uCo = []socketio.Conn{}
 				}
 				uCo = append(uCo, req.Ws)
-				userMap[req.Session.User.ID] = uCo
+				userMap[appCtx.Session.User.ID] = uCo
 			}
 			req.AppContext = appCtx
 			go SendRequest(req.Out, req)

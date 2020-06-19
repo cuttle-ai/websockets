@@ -20,10 +20,10 @@ import (
  */
 
 //WebsocketsServerID is the service id to be used with the discovery service
-var WebsocketsServerID = "Brain-Wesockets-Server"
+var WebsocketsServerID = "Brain-Websockets-Server"
 
 //WebsocketsServerRPCID is the rpc service id to be used with the discovery service
-var WebsocketsServerRPCID = "Brain-Wesockets-Server-RPC"
+var WebsocketsServerRPCID = "Brain-Websockets-Server-RPC"
 
 func init() {
 	/*
