@@ -74,7 +74,7 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	cookie, cErr := req.Cookie(authConfig.AuthHeaderKey)
 	if cErr != nil {
 		log.Warn("Auth cookie not found")
-		response.WriteError(res, response.Error{Err: "Couldn't find the auth header " + authConfig.AuthHeaderKey}, http.StatusForbidden)
+		response.WriteError(res, response.Error{Err: "Couldn't find the auth header " + authConfig.AuthHeaderKey}, http.StatusOK)
 		_, cancel := context.WithCancel(ctx)
 		cancel()
 		return
@@ -84,7 +84,7 @@ func (r Route) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	u, ok := authConfig.GetAutenticatedUser(cookie.Value)
 	if !ok {
 		log.Warn("User information not found the given auth header")
-		response.WriteError(res, response.Error{Err: "Couldn't find the user session " + cookie.Value}, http.StatusForbidden)
+		response.WriteError(res, response.Error{Err: "Couldn't find the user session " + cookie.Value}, http.StatusOK)
 		_, cancel := context.WithCancel(ctx)
 		cancel()
 		return
