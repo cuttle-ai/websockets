@@ -16,6 +16,7 @@ replace github.com/cuttle-ai/go-sdk => ../go-sdk/
 
 require (
 	github.com/cuttle-ai/auth-service v0.0.0-00010101000000-000000000000
+	github.com/cuttle-ai/brain v0.0.0-00010101000000-000000000000
 	github.com/cuttle-ai/configs v0.0.0-20200326184731-6eb244838d9c
 	github.com/googollee/go-socket.io v1.4.3
 	github.com/hashicorp/consul/api v1.4.0

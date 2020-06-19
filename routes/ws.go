@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/cuttle-ai/brain/models"
 	"github.com/cuttle-ai/websockets/config"
-	"github.com/cuttle-ai/websockets/models"
 	"github.com/cuttle-ai/websockets/routes/response"
 )
 
